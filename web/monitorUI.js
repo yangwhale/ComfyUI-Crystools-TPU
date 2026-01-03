@@ -1,7 +1,7 @@
 import { ProgressBarUIBase } from './progressBarUIBase.js';
 import { createStyleSheet, formatBytes } from './utils.js';
 export class MonitorUI extends ProgressBarUIBase {
-    constructor(rootElement, monitorCPUElement, monitorRAMElement, monitorHDDElement, monitorGPUSettings, monitorVRAMSettings, monitorTemperatureSettings, currentRate) {
+    constructor(rootElement, monitorCPUElement, monitorRAMElement, monitorHDDElement, monitorGPUSettings, monitorVRAMSettings, monitorTemperatureSettings, currentRate, monitorDutyCycleSettings = [], monitorTensorCoreSettings = []) {
         super('crystools-monitors-root', rootElement);
         Object.defineProperty(this, "rootElement", {
             enumerable: true,
@@ -45,6 +45,19 @@ export class MonitorUI extends ProgressBarUIBase {
             writable: true,
             value: monitorTemperatureSettings
         });
+        // TPU specific settings
+        Object.defineProperty(this, "monitorDutyCycleSettings", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: monitorDutyCycleSettings
+        });
+        Object.defineProperty(this, "monitorTensorCoreSettings", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: monitorTensorCoreSettings
+        });
         Object.defineProperty(this, "currentRate", {
             enumerable: true,
             configurable: true,
@@ -68,6 +81,12 @@ export class MonitorUI extends ProgressBarUIBase {
             configurable: true,
             writable: true,
             value: {}
+        });
+        Object.defineProperty(this, "rowBreakElements", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: []
         });
         Object.defineProperty(this, "createDOM", {
             enumerable: true,
@@ -95,6 +114,20 @@ export class MonitorUI extends ProgressBarUIBase {
                 this.updateAllAnimationDuration(this.currentRate);
             }
         });
+        Object.defineProperty(this, "createRowBreak", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: (afterIndex) => {
+                if (!this.rootElement) {
+                    return;
+                }
+                const rowBreak = document.createElement('div');
+                rowBreak.classList.add('crystools-tpu-row-break');
+                this.rootElement.appendChild(rowBreak);
+                this.rowBreakElements[afterIndex] = rowBreak;
+            }
+        });
         Object.defineProperty(this, "orderMonitors", {
             enumerable: true,
             configurable: true,
@@ -104,10 +137,45 @@ export class MonitorUI extends ProgressBarUIBase {
                     this.monitorCPUElement.htmlMonitorRef.style.order = '' + this.lastMonitor++;
                     this.monitorRAMElement.htmlMonitorRef.style.order = '' + this.lastMonitor++;
                     this.monitorGPUSettings.forEach((_monitorSettings, index) => {
-                        this.monitorGPUSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
-                        this.monitorVRAMSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
-                        this.monitorTemperatureSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
+                        if (this.monitorGPUSettings[index]?.htmlMonitorRef) {
+                            this.monitorGPUSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
+                        }
+                        if (this.monitorVRAMSettings[index]?.htmlMonitorRef) {
+                            this.monitorVRAMSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
+                        }
+                        if (this.monitorTemperatureSettings[index]?.htmlMonitorRef) {
+                            this.monitorTemperatureSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
+                        }
+                        // TPU specific monitors
+                        if (this.monitorDutyCycleSettings[index]?.htmlMonitorRef) {
+                            this.monitorDutyCycleSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
+                        }
+                        if (this.monitorTensorCoreSettings[index]?.htmlMonitorRef) {
+                            this.monitorTensorCoreSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
+                        }
+                        // Row break after this TPU group
+                        if (this.rowBreakElements[index]) {
+                            this.rowBreakElements[index].style.order = '' + this.lastMonitor++;
+                        }
                     });
+                    // Also check for TPU monitors if GPU settings are empty
+                    if (this.monitorGPUSettings.length === 0 && this.monitorVRAMSettings.length > 0) {
+                        this.monitorVRAMSettings.forEach((_monitorSettings, index) => {
+                            if (this.monitorVRAMSettings[index]?.htmlMonitorRef) {
+                                this.monitorVRAMSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
+                            }
+                            if (this.monitorDutyCycleSettings[index]?.htmlMonitorRef) {
+                                this.monitorDutyCycleSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
+                            }
+                            if (this.monitorTensorCoreSettings[index]?.htmlMonitorRef) {
+                                this.monitorTensorCoreSettings[index].htmlMonitorRef.style.order = '' + this.lastMonitor++;
+                            }
+                            // Row break after this TPU group
+                            if (this.rowBreakElements[index]) {
+                                this.rowBreakElements[index].style.order = '' + this.lastMonitor++;
+                            }
+                        });
+                    }
                     this.monitorHDDElement.htmlMonitorRef.style.order = '' + this.lastMonitor++;
                 }
                 catch (error) {
@@ -164,6 +232,26 @@ export class MonitorUI extends ProgressBarUIBase {
                     else {
                     }
                 });
+                // TPU specific: Duty Cycle
+                this.monitorDutyCycleSettings.forEach((monitorSettings, index) => {
+                    if (monitorSettings && data.gpus[index]) {
+                        const gpu = data.gpus[index];
+                        if (gpu === undefined || gpu.duty_cycle === undefined) {
+                            return;
+                        }
+                        this.updateMonitor(monitorSettings, gpu.duty_cycle);
+                    }
+                });
+                // TPU specific: TensorCore Utilization
+                this.monitorTensorCoreSettings.forEach((monitorSettings, index) => {
+                    if (monitorSettings && data.gpus[index]) {
+                        const gpu = data.gpus[index];
+                        if (gpu === undefined || gpu.tensorcore_util === undefined) {
+                            return;
+                        }
+                        this.updateMonitor(monitorSettings, gpu.tensorcore_util);
+                    }
+                });
             }
         });
         Object.defineProperty(this, "updateMonitor", {
@@ -214,6 +302,13 @@ export class MonitorUI extends ProgressBarUIBase {
                     monitorSettings && this.updatedAnimationDuration(monitorSettings, value);
                 });
                 this.monitorTemperatureSettings.forEach((monitorSettings) => {
+                    monitorSettings && this.updatedAnimationDuration(monitorSettings, value);
+                });
+                // TPU specific monitors
+                this.monitorDutyCycleSettings.forEach((monitorSettings) => {
+                    monitorSettings && this.updatedAnimationDuration(monitorSettings, value);
+                });
+                this.monitorTensorCoreSettings.forEach((monitorSettings) => {
                     monitorSettings && this.updatedAnimationDuration(monitorSettings, value);
                 });
             }

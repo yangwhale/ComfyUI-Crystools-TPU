@@ -13,4 +13,8 @@ export var Colors;
     Colors["VRAM"] = "#176EC7";
     Colors["TEMP_START"] = "#00ff00";
     Colors["TEMP_END"] = "#ff0000";
+    // TPU specific colors
+    Colors["HBM"] = "#176EC7";
+    Colors["DUTY_CYCLE"] = "#FF6B35";
+    Colors["TENSORCORE"] = "#F7931E";
 })(Colors || (Colors = {}));

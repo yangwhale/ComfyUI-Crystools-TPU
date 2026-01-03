@@ -3,10 +3,45 @@ import re
 import cpuinfo
 from cpuinfo import DataSource
 import psutil
-from .gpu import CGPUInfo
 from .hdd import getDrivesInfo
 
 from ..core import logger
+
+# Auto-detect TPU and use appropriate info class
+def _get_device_info_class():
+    """Returns CGPUInfo from tpu.py if TPU is detected, otherwise from gpu.py"""
+    try:
+        # Try to detect TPU via tpu_info
+        from tpu_info import device as tpu_device
+        chips_info = tpu_device.get_local_chips()
+        if chips_info and chips_info[1] > 0:
+            from .tpu import CGPUInfo
+            logger.info("Using TPU monitoring (tpu.py)")
+            return CGPUInfo
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    
+    # Try JAX TPU detection
+    try:
+        import jax
+        devices = jax.devices()
+        for device in devices:
+            if 'tpu' in str(device).lower():
+                from .tpu import CGPUInfo
+                logger.info("Using TPU monitoring (tpu.py)")
+                return CGPUInfo
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    
+    # Fallback to GPU
+    from .gpu import CGPUInfo
+    return CGPUInfo
+
+CGPUInfo = _get_device_info_class()
 
 
 class CHardwareInfo:
