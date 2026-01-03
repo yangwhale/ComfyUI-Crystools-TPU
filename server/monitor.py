@@ -123,3 +123,14 @@ async def getGPUs(request):
   except Exception as e:
     logger.error(e)
     return web.Response(status=400, text=str(e))
+
+
+@PromptServer.instance.routes.get("/crystools/monitor/device_type")
+def getDeviceType(request):
+    try:
+        # Get device_type from GPUInfo (stored as cudaDevice in tpu.py)
+        device_type = getattr(cmonitor.hardwareInfo.GPUInfo, 'cudaDevice', 'cuda')
+        return web.json_response({'device_type': device_type})
+    except Exception as e:
+        logger.error(e)
+        return web.Response(status=400, text=str(e))

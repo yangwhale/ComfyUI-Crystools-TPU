@@ -297,16 +297,16 @@ class CGPUInfo:
 
                     if self.switchVRAM and deviceIndex < len(self.gpusVRAM) and self.gpusVRAM[deviceIndex]:
                         try:
-                            # Try JAX device first
-                            if deviceHandle is not None:
-                                memory = self.deviceGetMemoryInfo(deviceHandle)
-                                vramUsed = memory['used']
-                                vramTotal = memory['total']
-                            # Fallback to tpu_info usage cache
-                            elif usage_cache and deviceIndex < len(usage_cache):
+                            # Use tpu_info usage cache for accurate HBM usage (preferred)
+                            if usage_cache and deviceIndex < len(usage_cache):
                                 usage = usage_cache[deviceIndex]
                                 vramUsed = usage.memory_usage
                                 vramTotal = usage.total_memory
+                            # Fallback to JAX device memory_stats (less accurate, shows JAX allocator only)
+                            elif deviceHandle is not None:
+                                memory = self.deviceGetMemoryInfo(deviceHandle)
+                                vramUsed = memory['used']
+                                vramTotal = memory['total']
                             
                             if vramTotal and vramTotal != 0:
                                 vramPercent = vramUsed / vramTotal * 100
@@ -611,11 +611,7 @@ class CGPUInfo:
                 # Use duty_cycle_pct attribute (not duty_cycle)
                 duty_cycle_pct = getattr(usage, 'duty_cycle_pct', None)
                 if duty_cycle_pct is not None:
-                    result = float(duty_cycle_pct)
-                    # Log first time for debugging
-                    if deviceIndex == 0:
-                        logger.info(f'TPU Duty Cycle 0: {result:.1f}%')
-                    return result
+                    return float(duty_cycle_pct)
             else:
                 logger.debug(f'deviceGetDutyCycle: usage_list is None or index out of range')
         except Exception as e:
